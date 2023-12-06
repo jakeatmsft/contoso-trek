@@ -1,18 +1,21 @@
 id: template_chat_flow
 name: Template Chat Flow
-environment:
-  python_requirements_txt: requirements.txt
 inputs:
   chat_history:
     type: list
     default: []
+    is_chat_input: false
+    is_chat_history: true
   question:
     type: string
+    default: |-
+      What can you tell me about 
+      your jackets?
     is_chat_input: true
-    default: What can you tell me about your jackets?
   customerId:
     type: string
     default: "2"
+    is_chat_input: false
 outputs:
   answer:
     type: string
@@ -28,19 +31,21 @@ nodes:
     type: package
     tool: promptflow.tools.embedding.embedding
   inputs:
-    connection: isis-aoai
-    input: ${inputs.question}
+    connection: Default_AzureOpenAI
     deployment_name: text-embedding-ada-002
+    input: ${inputs.question}
+  use_variants: false
 - name: retrieve_documentation
   type: python
   source:
     type: code
     path: retrieve_documentation.py
   inputs:
-    search: contoso-search
+    search: AzureAISearch
     question: ${inputs.question}
-    index_name: contoso-products
+    index_name: product-info
     embedding: ${question_embedding.output}
+  use_variants: false
 - name: llm_response
   type: llm
   source:
@@ -50,16 +55,18 @@ nodes:
     deployment_name: gpt-35-turbo
     prompt_text: ${customer_prompt.output}
     question: ${inputs.question}
-  connection: isis-aoai
+  connection: Default_AzureOpenAI
   api: chat
+  use_variants: false
 - name: customer_lookup
   type: python
   source:
     type: code
     path: customer_lookup.py
   inputs:
-    conn: contoso-cosmos
+    conn: cosmos-db
     customerId: ${inputs.customerId}
+  use_variants: false
 - name: customer_prompt
   type: prompt
   source:
@@ -67,5 +74,9 @@ nodes:
     path: customer_prompt.jinja2
   inputs:
     documentation: ${retrieve_documentation.output}
-    history: ${inputs.chat_history}
     customer: ${customer_lookup.output}
+    history: ${inputs.chat_history}
+  use_variants: false
+node_variants: {}
+environment:
+  python_requirements_txt: requirements.txt
